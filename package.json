@@ -1,0 +1,22 @@
+{
+  "name": "audit-display",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/fetch-airtable.mjs",
+    "build": "eleventy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@11ty/eleventy": "^3.1.0"
+  },
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "dotenv": "^16.5.0",
+    "node-fetch": "^3.3.2"
+  }
+}
