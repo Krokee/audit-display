@@ -89,9 +89,15 @@ async function buildData() {
 			const latestAudit = getLatestAuditForSite(audits, site.id);
 			const f = latestAudit ? latestAudit.fields : {};
 
+			if (!latestAudit) {
+				console.log(`❌ No audit for site: ${site.id}`);
+			} else {
+				console.log(`✅ Audit for ${site.id}:`, Object.keys(f));
+			}
+
 			return {
 				id: site.id,
-				name: site.fields['fld4lCHk81VtCjZZ4'] || site.fields['Name'] || 'Unnamed Site',
+				name: site.fields['Name'] || 'Unnamed Site',
 				audit: latestAudit
 					? {
 						date: f['fldnDdVmUgQKdl0x8'],
