@@ -9,32 +9,114 @@ layout: base.njk
 ---
 
 {% set fields = siteData.site.fields %}
-<h1>{{ fields.Name }}</h1>
-<p>
-	<strong>Status:</strong>
-	{{ fields.Status or "N/A" }}</p>
-<p>
-	<a href="{{ fields.URL }}" target="_blank">{{ fields.URL }}</a>
-</p>
+<div class="container py-4">
+	<h1 class="display-4 mb-3">{{ fields.Name }}</h1>
 
-{% if siteData.audits and siteData.audits.length %}
-	{% set latest = siteData.audits | sort(attribute = 'fields.Date') | last %}
-	<h2>Latest Audit ({{ latest.fields.Date }})</h2>
-	<ul>
-		{% for key, value in latest.fields %}
-			<li>
-				<strong>{{ key }}:</strong>
-				{% if value and(value.constructor.name == "Array") %}
-					{{ value | join(', ') }}
-				{% else %}
-					{{ value }}
-				{% endif %}
-			</li>
-		{% endfor %}
-	</ul>
+	<div class="mb-4">
+		<p>
+			<strong>Status:</strong>
+			{{ fields.Status or "N/A" }}</p>
+		{% if fields.URL %}
+			<p>
+				<a href="{{ fields.URL }}" class="btn btn-outline-primary" target="_blank">Visit Site</a>
+			</p>
+		{% endif %}
+		<p>
+			<a href="/" class="btn btn-link">← Back to site list</a>
+		</p>
+	</div>
 
-{% else %}
-	<p>
-		<em>No audit data available.</em>
-	</p>
-{% endif %}
+	{% if siteData.audits and siteData.audits.length %}
+		{% set latest = siteData.audits | sort(attribute = 'fields.Date') | last %}
+		{% set audit = latest.fields %}
+
+		<h2 class="h4 mt-4">Latest Audit <small class="text-muted">({{ audit.Date }})</small>
+		</h2>
+
+		<div class="row g-4">
+			<div class="col-md-6">
+				<h5>Ecoindex & Carbon</h5>
+				<ul class="list-group">
+					<li class="list-group-item">
+						<strong>Ecoindex Note:</strong>
+						<span class="badge text-bg-{% if audit['ECOINDEX Note'] == 'A' %}success{% elseif audit['ECOINDEX Note'] == 'F' %}danger{% elseif audit['ECOINDEX Note'] == 'C' %}warning{% else %}secondary{% endif %}">
+							{{ audit['ECOINDEX Note'] }}
+						</span>
+					</li>
+					<li class="list-group-item">
+						<strong>Website Carbon Note:</strong>
+						<span class="badge text-bg-{% if audit['Website Carbon Note'] == 'A' %}success{% elseif audit['Website Carbon Note'] == 'F' %}danger{% elseif audit['Website Carbon Note'] == 'C' %}warning{% else %}secondary{% endif %}">
+							{{ audit['Website Carbon Note'] }}
+						</span>
+					</li>
+				</ul>
+			</div>
+
+			<div class="col-md-6">
+				<h5>Timing</h5>
+				<ul class="list-group">
+					<li class="list-group-item">
+						<strong>TTFB:</strong>
+						{{ audit['Bytecheck TTFB'] }} ms</li>
+					<li class="list-group-item">
+						<strong>Total Time:</strong>
+						{{ audit['Bytecheck Total Time'] }} ms</li>
+				</ul>
+			</div>
+
+			<div class="col-md-6">
+				<h5>Wave Accessibility</h5>
+				<ul class="list-group">
+					<li class="list-group-item">
+						<strong>Errors:</strong>
+						<span class="badge bg-{% if audit['WAVE ERRORS'] == 0 %}success{% elseif audit['WAVE ERRORS'] < 10 %}warning{% else %}danger{% endif %}">
+							{{ audit['WAVE ERRORS'] }}
+						</span>
+					</li>
+					<li class="list-group-item">
+						<strong>Contrast Errors:</strong>
+						<span class="badge bg-{% if audit['WAVE CONTRAST ERRORS'] == 0 %}success{% elseif audit['WAVE CONTRAST ERRORS'] < 10 %}warning{% else %}danger{% endif %}">
+							{{ audit['WAVE CONTRAST ERRORS'] }}
+						</span>
+					</li>
+					<li class="list-group-item">
+						<strong>Alerts:</strong>
+						<span class="badge bg-{% if audit['WAVE ALERTS'] == 0 %}success{% elseif audit['WAVE ALERTS'] < 10 %}warning{% else %}danger{% endif %}">
+							{{ audit['WAVE ALERTS'] }}
+						</span>
+					</li>
+				</ul>
+			</div>
+
+			<div class="col-md-6">
+				<h5>PageSpeed Scores</h5>
+				<ul class="list-group">
+					<li class="list-group-item">
+						<strong>Desktop:</strong><br>
+						{% set d_perf = audit['Pagespeed DESKTOP Performances'] %}
+						{% set d_access = audit['Pagespeed DESKTOP Accessibilité'] %}
+						{% set d_seo = audit['Pagespeed DESKTOP SEO'] %}
+						{% set d_bp = audit['Pagespeed DESKTOP Bonnes pratiques'] %}
+            Performance: <span class="badge bg-{% if d_perf < 50 %}danger{% elseif d_perf < 90 %}warning{% else %}success{% endif %}">{{ d_perf }}/100</span><br>
+            Accessibility: <span class="badge bg-{% if d_access < 50 %}danger{% elseif d_access < 90 %}warning{% else %}success{% endif %}">{{ d_access }}/100</span><br>
+            SEO: <span class="badge bg-{% if d_seo < 50 %}danger{% elseif d_seo < 90 %}warning{% else %}success{% endif %}">{{ d_seo }}/100</span><br>
+            Best Practices: <span class="badge bg-{% if d_bp < 50 %}danger{% elseif d_bp < 90 %}warning{% else %}success{% endif %}">{{ d_bp }}/100</span>
+					</li>
+					<li class="list-group-item">
+						<strong>Mobile:</strong><br>
+						{% set m_perf = audit['Pagespeed MOBILE Performances'] %}
+						{% set m_access = audit['Pagespeed MOBILE Accessibilité'] %}
+						{% set m_seo = audit['Pagespeed MOBILE SEO'] %}
+						{% set m_bp = audit['Pagespeed MOBILE Bonnes pratiques'] %}
+            Performance: <span class="badge bg-{% if m_perf < 50 %}danger{% elseif m_perf < 90 %}warning{% else %}success{% endif %}">{{ m_perf }}/100</span><br>
+            Accessibility: <span class="badge bg-{% if m_access < 50 %}danger{% elseif m_access < 90 %}warning{% else %}success{% endif %}">{{ m_access }}/100</span><br>
+            SEO: <span class="badge bg-{% if m_seo < 50 %}danger{% elseif m_seo < 90 %}warning{% else %}success{% endif %}">{{ m_seo }}/100</span><br>
+            Best Practices: <span class="badge bg-{% if m_bp < 50 %}danger{% elseif m_bp < 90 %}warning{% else %}success{% endif %}">{{ m_bp }}/100</span>
+					</li>
+				</ul>
+			</div>
+		</div>
+	{% else %}
+		<p class="text-muted">No audit data available.</p>
+	{% endif %}
+</div>

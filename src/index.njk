@@ -3,15 +3,42 @@ title: Sites List
 layout: base.njk
 ---
 
-<h1>Sites</h1>
+<div class="container py-4">
+	<h1 class="display-5 mb-4">All Sites</h1>
+	<div class="list-group">
+		{% for item in sites %}
+			{% set site = item.site.fields %}
+			{% set latest = item.audits | sort(attribute = 'fields.Date') | last %}
+			{% set audit = latest.fields %}
 
-<ul>
-	{% for item in sites %}
-		{% set site = item.site.fields %}
-		<li>
-			<a href="/site/{{ item.site.id }}/">
-				<strong>{{ site.Name }}</strong>
+			{% set scores = [
+				audit['Pagespeed DESKTOP Performances'],
+				audit['Pagespeed DESKTOP Accessibilité'],
+				audit['Pagespeed DESKTOP SEO'],
+				audit['Pagespeed DESKTOP Bonnes pratiques'],
+				audit['Pagespeed MOBILE Performances'],
+				audit['Pagespeed MOBILE Accessibilité'],
+				audit['Pagespeed MOBILE SEO'],
+				audit['Pagespeed MOBILE Bonnes pratiques']
+			] %}
+			{% set total = scores | sum %}
+			{% set meta = (total / scores.length) | round(0, 'half') %}
+			{% set metaColor = "secondary" %}
+			{% if meta >= 90 %}
+				{% set metaColor = "success" %}
+			{% elseif meta >= 60 %}
+				{% set metaColor = "warning" %}
+			{% else %}
+				{% set metaColor = "danger" %}
+			{% endif %}
+
+			<a href="/site/{{ item.site.id }}/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+				<div>
+					<div class="fw-bold">{{ site.Name }}</div>
+					<small class="text-muted">{{ site.Status or "Unknown" }}</small>
+				</div>
+				<span class="badge bg-{{ metaColor }} rounded-pill">{{ meta }}/100</span>
 			</a>
-		</li>
-	{% endfor %}
-</ul>
+		{% endfor %}
+	</div>
+</div>
