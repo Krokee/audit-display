@@ -1,0 +1,40 @@
+---
+pagination:
+  data: collections.sitePages
+  size: 1
+  alias: siteData
+  addAllPagesToCollections: true
+permalink: "site/{{ siteData.id }}/index.html"
+layout: base.njk
+---
+
+{% set fields = siteData.site.fields %}
+<h1>{{ fields.Name }}</h1>
+<p>
+	<strong>Status:</strong>
+	{{ fields.Status or "N/A" }}</p>
+<p>
+	<a href="{{ fields.URL }}" target="_blank">{{ fields.URL }}</a>
+</p>
+
+{% if siteData.audits and siteData.audits.length %}
+	{% set latest = siteData.audits | sort(attribute = 'fields.Date') | last %}
+	<h2>Latest Audit ({{ latest.fields.Date }})</h2>
+	<ul>
+		{% for key, value in latest.fields %}
+			<li>
+				<strong>{{ key }}:</strong>
+				{% if value and(value.constructor.name == "Array") %}
+					{{ value | join(', ') }}
+				{% else %}
+					{{ value }}
+				{% endif %}
+			</li>
+		{% endfor %}
+	</ul>
+
+{% else %}
+	<p>
+		<em>No audit data available.</em>
+	</p>
+{% endif %}

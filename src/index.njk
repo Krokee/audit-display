@@ -1,0 +1,17 @@
+---
+title: Sites List
+layout: base.njk
+---
+
+<h1>Sites</h1>
+
+<ul>
+	{% for item in sites %}
+		{% set site = item.site.fields %}
+		<li>
+			<a href="/site/{{ item.site.id }}/">
+				<strong>{{ site.Name }}</strong>
+			</a>
+		</li>
+	{% endfor %}
+</ul>
