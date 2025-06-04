@@ -1,143 +1,212 @@
-// fetch-airtable.mjs
-import fs from 'fs';
+// File: scripts/fetch-airtable.mjs
+
+import 'dotenv/config';
+import fs from 'fs/promises';
 import path from 'path';
-import fetch from 'node-fetch';
-import { config as dotenvConfig } from 'dotenv';
 
-dotenvConfig();
 
-const includedSiteIds = JSON.parse(fs.readFileSync(new URL('../site-config.json', import.meta.url))).includeSites;
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const BASE_ID = process.env.AIRTABLE_BASE_ID;
+// ————————————————————————————————————————————————————————————————
+// 1) ENV & PATHS
+// ————————————————————————————————————————————————————————————————
 
-const TABLES = {
-	sites: 'SITES',
-	audits: 'AUDITS',
-};
-
-const API_URL = `https://api.airtable.com/v0/${BASE_ID}`;
-
-async function fetchAirtableRecords(tableName) {
-	const records = [];
-	let offset = null;
-
-	do {
-		const params = new URLSearchParams({
-			cellFormat: 'json',
-			returnFieldsByFieldId: 'true',
-			...(offset ? { offset } : {}),
-		});
-
-		const res = await fetch(`${API_URL}/${encodeURIComponent(tableName)}?${params}`, {
-			headers: {
-				Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-			},
-		});
-
-		if (!res.ok) {
-			throw new Error(`Error fetching ${tableName}: ${res.statusText}`);
-		}
-
-		const json = await res.json();
-		records.push(...json.records);
-		offset = json.offset;
-	} while (offset);
-
-	console.log(`Fetched ${records.length} from ${tableName}`);
-	return records;
+const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
+if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+	console.error('❌ Missing AIRTABLE_API_KEY or AIRTABLE_BASE_ID in .env');
+	process.exit(1);
 }
 
-function getLatestAuditForSite(audits, siteId) {
-	const siteFieldId = 'fld7eyVpaA0NWYFze';
-	const dateFieldId = 'fldnDdVmUgQKdl0x8';
+import Airtable from 'airtable';
+var base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
 
-	const related = audits.filter(a => {
-		if (!a || typeof a !== 'object') return false;
-		const fields = a.fields;
-		if (!fields || typeof fields !== 'object') return false;
-		const siteLinks = fields[siteFieldId];
-		if (!Array.isArray(siteLinks)) {
-			console.warn(`⚠️ Skipping audit ${a.id || '[no id]'} — invalid 'Site concerné':`, siteLinks);
-			return false;
-		}
-		return siteLinks.includes(siteId);
+const PROJECT_ROOT = path.resolve();
+const CONFIG_PATH = path.join(PROJECT_ROOT, 'site-config.json');
+const OUTPUT_DIR = path.join(PROJECT_ROOT, 'src', '_data');
+const OUTPUT_FILE = path.join(OUTPUT_DIR, 'sites.json');
+
+// ————————————————————————————————————————————————————————————————
+// 2) TABLE & FIELD IDS (these come from your schema export)
+// ————————————————————————————————————————————————————————————————
+
+const SITES_TABLE_ID = 'tblrQMtp54PlE21XX';
+const AUDITS_TABLE_ID = 'tbl1eXMuVSBhLMD9z';
+
+// In SITES: the linked‐record field “Ecoindex” (links to AUDITS)
+const SITE_ECOINDEX_FIELD_ID = 'fldYbJEGdk7JwVzXF';
+
+// In AUDITS: the linked‐record field “Site concerné” (links to SITES)
+const AUDIT_SITE_FIELD_ID = 'fld7eyVpaA0NWYFze';
+
+// In AUDITS: the “Date” field (ISO date string)
+const AUDIT_DATE_FIELD_ID = 'fldnDdVmUgQKdl0x8';
+
+// ————————————————————————————————————————————————————————————————
+// 3) HELPERS: fetch via REST with fieldsByFieldId=true
+// ————————————————————————————————————————————————————————————————
+
+async function fetchAllRecords(tableId) {
+	console.log(`🔄 Fetching all records from ${tableId} (Airtable.js)…`);
+	const all = [];
+
+	base(tableId).select({
+		view: "ALL"
+	}).eachPage(function page(records, fetchNextPage) {
+		// This function (`page`) will get called for each page of records.
+
+		records.forEach(function (record) {
+			console.log('Retrieved', record.get('fldyOSUh07mWrSgpM'));
+		});
+
+		// To fetch the next page of records, call `fetchNextPage`.
+		// If there are more records, `page` will get called again.
+		// If there are no more records, `done` will get called.
+		fetchNextPage();
+
+	}, function done(err) {
+		if (err) { console.error(err); return; }
 	});
 
-	const sorted = related.sort((a, b) => new Date(b.fields[dateFieldId]) - new Date(a.fields[dateFieldId]));
-	return sorted[0] || null;
+	console.log(`✅ Retrieved ${all.length} records from ${tableId}`);
+	return all;
 }
 
-async function buildData() {
-	const sites = await fetchAirtableRecords(TABLES.sites);
-	const audits = await fetchAirtableRecords(TABLES.audits);
+// ————————————————————————————————————————————————————————————————
+// 4) MAIN
+// ————————————————————————————————————————————————————————————————
 
-	console.log("Included site IDs:", includedSiteIds);
-	sites.forEach(site => {
-		console.log(`Site record: id=${site.id} name=${site.fields?.Name}`);
-	});
+async function main() {
+	console.log('🚀 Starting fetch-airtable script');
 
-	const result = sites
-		.filter(site => {
-			if (!site.id) {
-				console.warn("⚠️ Skipping site without ID:", site);
-				return false;
-			}
-			return includedSiteIds.includes(site.id);
-		})
-		.map(site => {
-			const latestAudit = getLatestAuditForSite(audits, site.id);
-			const f = latestAudit ? latestAudit.fields : {};
+	// 4.1) Read includeSites from site-config.json
+	console.log('\n1️⃣  Reading site-config.json…');
+	let config;
+	try {
+		config = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
+	} catch (err) {
+		console.error(`❌ Failed to read/parse ${CONFIG_PATH}:`, err);
+		process.exit(1);
+	}
+	const includeSiteIds = Array.isArray(config.includeSites)
+		? config.includeSites
+		: [];
+	if (!includeSiteIds.length) {
+		console.error('❌ "includeSites" array is empty in site-config.json');
+		process.exit(1);
+	}
+	console.log(`   • Will include these SITE IDs: ${includeSiteIds.join(', ')}`);
 
-			if (!latestAudit) {
-				console.log(`❌ No audit for site: ${site.id}`);
-			} else {
-				console.log(`✅ Audit for ${site.id}:`, Object.keys(f));
-			}
+	// 4.2) Fetch all SITES via REST (fields keyed by ID)
+	console.log('\n2️⃣  Fetching all SITES via Airtable.js…');
+	let siteRecs;
+	try {
+		siteRecs = await fetchAllRecords(SITES_TABLE_ID);
+	} catch (err) {
+		console.error('❌ Error fetching SITES:', err);
+		process.exit(1);
+	}
 
-			return {
-				id: site.id,
-				name: site.fields['Name'] || 'Unnamed Site',
-				audit: latestAudit
-					? {
-						date: f['fldnDdVmUgQKdl0x8'],
-						ecoindexNote: f['fld5h0yHSG7S2AZug'],
-						websiteCarbonNote: f['fldOO9qoXCP1Zh0tr'],
-						environment: f['fld6oLbteTkQJ6ao5'],
-						pagespeed: {
-							mobile: {
-								performance: f['fldtoOj83ztDP62MC'],
-								accessibility: f['fld3MGINZteer61CU'],
-								bestPractices: f['fldky2G0tu5IZ8pVo'],
-								seo: f['fldc3ztBsIYeqYxcN'],
-							},
-							desktop: {
-								performance: f['fldprvkjSnNE25AjX'],
-								accessibility: f['fldpk49zqimc6QsxR'],
-								bestPractices: f['fldpvldyjDpNs8DmM'],
-								seo: f['fld2OPL3aRZpQR7EK'],
-							},
-						},
-						wave: {
-							errors: f['fldPGauO8kjDhmaxL'],
-							contrastErrors: f['fldx1HKa4sKk7HmZO'],
-							alerts: f['fldpFLPHyu4i9h60G'],
-						},
-						bytecheck: {
-							ttfb: f['fldTbbebfl3l0pL1E'],
-							totalTime: f['fldF9UtlgLrCEHFpY'],
-						},
-					}
-					: null,
-			};
-		});
+	// // 4.3) Filter SITES to include only those in includeSites
+	// console.log('\n3️⃣  Filtering SITES by includeSites list:');
+	// const filteredSites = siteRecs.filter((rec) => {
+	// 	const keep = includeSiteIds.includes(rec.id);
+	// 	console.log(`   • Site ${rec.id}: ${keep ? 'KEEP' : 'SKIP'}`);
+	// 	return keep;
+	// });
+	// console.log(`✅ ${filteredSites.length} site(s) remain.`);
 
-	const outputDir = path.join(path.resolve(), 'src/_data');
-	fs.mkdirSync(outputDir, { recursive: true });
-	fs.writeFileSync(path.join(outputDir, 'sites.json'), JSON.stringify(result, null, 2));
-	console.log('✅ Airtable data saved to src/_data/sites.json');
+	// // 4.4) Fetch all AUDITS via REST (fields keyed by ID)
+	// console.log('\n4️⃣  Fetching all AUDITS via REST…');
+	// let auditRecs;
+	// try {
+	// 	auditRecs = await fetchAllRecords(AUDITS_TABLE_ID);
+	// } catch (err) {
+	// 	console.error('❌ Error fetching AUDITS:', err);
+	// 	process.exit(1);
+	// }
+
+	// // 4.5) Link AUDITS to filtered SITES by record ID
+	// console.log('\n5️⃣  Building site → audits map:');
+	// const siteToAuditsMap = new Map();
+	// filteredSites.forEach((s) => siteToAuditsMap.set(s.id, []));
+
+	// for (const aRec of auditRecs) {
+	// 	const linkedSiteIds = aRec.fields[AUDIT_SITE_FIELD_ID] || [];
+	// 	if (!Array.isArray(linkedSiteIds) || !linkedSiteIds.length) {
+	// 		console.warn(`   ⚠️  Audit ${aRec.id} has no linked sites.`);
+	// 		continue;
+	// 	}
+	// 	linkedSiteIds.forEach((siteId) => {
+	// 		if (!siteToAuditsMap.has(siteId)) {
+	// 			console.log(
+	// 				`   • Audit ${aRec.id} links to ${siteId}, not in includeSites; ignoring.`
+	// 			);
+	// 		} else {
+	// 			siteToAuditsMap.get(siteId).push(aRec);
+	// 		}
+	// 	});
+	// }
+	// console.log('✅ site → audits map built.');
+
+	// // 4.6) Pick latest audit per site
+	// console.log('\n6️⃣  Determining latest audit per site:');
+	// const siteToLatest = new Map();
+	// for (const siteRec of filteredSites) {
+	// 	const arr = siteToAuditsMap.get(siteRec.id) || [];
+	// 	if (!arr.length) {
+	// 		console.log(`   • Site ${siteRec.id} has no audits.`);
+	// 		siteToLatest.set(siteRec.id, null);
+	// 		continue;
+	// 	}
+	// 	let latest = null;
+	// 	let latestDate = '';
+	// 	arr.forEach((aRec) => {
+	// 		const d = aRec.fields[AUDIT_DATE_FIELD_ID];
+	// 		if (!d) {
+	// 			console.warn(`   ⚠️  Audit ${aRec.id} for site ${siteRec.id} missing date.`);
+	// 			return;
+	// 		}
+	// 		if (latest === null || d > latestDate) {
+	// 			latest = aRec;
+	// 			latestDate = d;
+	// 		}
+	// 	});
+	// 	if (!latest) {
+	// 		console.log(`   • Site ${siteRec.id} no dated audits.`);
+	// 		siteToLatest.set(siteRec.id, null);
+	// 	} else {
+	// 		console.log(`   • Site ${siteRec.id}: latest = ${latest.id} (${latestDate})`);
+	// 		siteToLatest.set(siteRec.id, latest);
+	// 	}
+	// }
+
+	// // 4.7) Build output JSON
+	// console.log('\n7️⃣  Building output JSON:');
+	// const output = filteredSites.map((s) => {
+	// 	const latest = siteToLatest.get(s.id);
+	// 	return {
+	// 		site: { id: s.id, fields: s.fields },
+	// 		latestAudit: latest
+	// 			? { id: latest.id, fields: latest.fields }
+	// 			: null,
+	// 	};
+	// });
+	// console.log('✅ JSON structure ready.');
+
+	// // 4.8) Write to disk
+	// console.log(`\n8️⃣  Writing to ${OUTPUT_FILE}:`);
+	// try {
+	// 	await fs.mkdir(OUTPUT_DIR, { recursive: true });
+	// 	await fs.writeFile(OUTPUT_FILE, JSON.stringify(output, null, 2), 'utf8');
+	// 	console.log(`✅ Successfully wrote ${output.length} entries.`);
+	// } catch (err) {
+	// 	console.error(`❌ Failed to write file:`, err);
+	// 	process.exit(1);
+	// }
+
+	// console.log('\n🏁 Done.');
 }
 
-buildData().catch(err => {
-	console.error('❌ Failed to fetch data from Airtable:', err);
+main().catch((err) => {
+	console.error('❌ Unexpected error:', err);
+	process.exit(1);
 });
