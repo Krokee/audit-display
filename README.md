@@ -44,6 +44,14 @@ src/_includes/        Base layout
 site-config.json      IDs of sites to include from Airtable
 ```
 
+## CI/CD Workflow
+
+The workflow at `.github/workflows/ci-cd.yml` builds and deploys the site to
+GitHub Pages. It can be triggered manually, on a daily schedule, or via a
+`repository_dispatch` webhook. The job installs dependencies, runs `npm run fetch`
+and `npm run build`, then uploads the `dist` directory and deploys it with
+`actions/deploy-pages@v1`.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE). Enjoy! 🎉

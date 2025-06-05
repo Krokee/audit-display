@@ -19,9 +19,6 @@ const OUTPUT_FILE = path.join(OUTPUT_DIR, 'sites.json');
 const SITES_TABLE_ID = 'tblrQMtp54PlE21XX'; // SITES
 const AUDITS_TABLE_ID = 'tbl1eXMuVSBhLMD9z'; // AUDITS
 
-// Field IDs used to join
-const SITE_ECOINDEX_FLD = 'fldYbJEGdk7JwVzXF'; // in SITES: "Ecoindex"
-const AUDIT_SITE_FLD = 'fld7eyVpaA0NWYFze'; // in AUDITS: "Site concerné"
 
 /**
  * Fetch all pages from an Airtable table via REST, optionally filtering,
