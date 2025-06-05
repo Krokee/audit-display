@@ -1,0 +1,30 @@
+name: Build and Deploy
+
+on:
+  repository_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - name: Fetch data from Airtable
+        run: npm run fetch
+        env:
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
+      - run: npm run build
+      - uses: actions/configure-pages@v3
+      - uses: actions/upload-pages-artifact@v1
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v1
