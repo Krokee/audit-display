@@ -8,6 +8,7 @@ module.exports = function (eleventyConfig) {
 	});
 
 	return {
+		pathPrefix: "/audits/",
 		dir: {
 			input: "src",
 			output: "dist",
