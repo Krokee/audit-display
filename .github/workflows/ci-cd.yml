@@ -1,10 +1,11 @@
 name: Build and Deploy via FTP
 
 on:
-  repository_dispatch:
+  push: # Trigger on every push
+  workflow_dispatch: # Manual trigger
   schedule:
-    - cron: "0 0 * * *"
-  workflow_dispatch:
+    - cron: "0 0 * * *" # Daily at 00:00 UTC
+  repository_dispatch: # Webhook trigger
 
 jobs:
   build:
@@ -34,5 +35,5 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist
-          server-dir: /portfolio.solydev.com/audits/ # Change this to your Apache path
+          local-dir: ./dist/
+          server-dir: /portfolio.solydev.com/audits/
