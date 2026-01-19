@@ -3,8 +3,6 @@ name: Build and Deploy via FTP
 on:
   push: # Trigger on every push
   workflow_dispatch: # Manual trigger
-  schedule:
-    - cron: "0 0 * * *" # Daily at 00:00 UTC
   repository_dispatch: # Webhook trigger
 
 jobs:
